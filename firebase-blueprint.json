@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Stores comprehensive patient profile information",
+      "type": "object",
+      "properties": {
+        "full_name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "uid": { "type": "string" },
+        "phone": { "type": "string" },
+        "dob": { "type": "string", "format": "date" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "nationality": { "type": "string" },
+        "height": { "type": "number" },
+        "weight": { "type": "number" },
+        "blood_group": { "type": "string" },
+        "chronic_diseases": { "type": "string" },
+        "allergies": { "type": "string" },
+        "current_meds": { "type": "string" },
+        "surgeries": { "type": "string" },
+        "emergency_contact": { "type": "string" },
+        "smoking_status": { "type": "string", "enum": ["Never", "Former", "Current"] },
+        "alcohol_use": { "type": "string", "enum": ["Never", "Occasional", "Frequent"] },
+        "photo_url": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "uid", "full_name"]
+    },
+    "reports": {
+      "title": "Medical Report",
+      "description": "Stores clinical reports and diagnostics",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "New", "Completed"] },
+        "type": { "type": "string" },
+        "patient_id": { "type": "string" }
+      },
+      "required": ["title", "date", "status", "patient_id"]
+    },
+    "chats": {
+      "title": "Chat Session",
+      "description": "Stores previous AI consultations",
+      "type": "object",
+      "properties": {
+        "patient_id": { "type": "string" },
+        "title": { "type": "string" },
+        "last_message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "mode": { "type": "string" }
+      },
+      "required": ["patient_id", "title", "timestamp"]
+    },
+    "medicines": {
+      "title": "Medicine Information",
+      "description": "Stores detailed information about drugs and medicines",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "composition": { "type": "string" },
+        "uses": { "type": "string" },
+        "side_effects": { "type": "string" },
+        "image_url": { "type": "string" },
+        "manufacturer": { "type": "string" }
+      },
+      "required": ["name", "composition", "uses"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profile document"
+    },
+    "/reports/{reportId}": {
+      "schema": "reports",
+      "description": "Clinical report document"
+    },
+    "/chats/{chatId}": {
+      "schema": "chats",
+      "description": "Chat session document"
+    },
+    "/medicines/{medicineId}": {
+      "schema": "medicines",
+      "description": "Medicine information document"
+    }
+  }
+}

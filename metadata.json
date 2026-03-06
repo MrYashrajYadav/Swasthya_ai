@@ -1,0 +1,8 @@
+{
+  "name": "Swasthya.Ai",
+  "description": "Your AI-powered virtual healthcare assistant for symptom checking, medical scanning, and consultation.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

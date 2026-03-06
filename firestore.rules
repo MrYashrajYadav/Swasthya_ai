@@ -1,0 +1,147 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (matches auth.uid)
+    // Fields:
+    //   - full_name: string (required)
+    //   - email: string (required)
+    //   - uid: string (required, immutable)
+    //   - phone: string (optional)
+    //   - dob: string (optional, YYYY-MM-DD)
+    //   - gender: string (optional, enum: Male, Female, Other)
+    //   - nationality: string (optional)
+    //   - height: number (optional)
+    //   - weight: number (optional)
+    //   - blood_group: string (optional)
+    //   - chronic_diseases: string (optional)
+    //   - allergies: string (optional)
+    //   - current_meds: string (optional)
+    //   - surgeries: string (optional)
+    //   - emergency_contact: string (optional)
+    //   - smoking_status: string (optional, enum)
+    //   - alcohol_use: string (optional, enum)
+    //   - photo_url: string (optional)
+    //   - created_at: string (required, ISO 8601)
+    //
+    // Collection: reports
+    // Document ID: reportId
+    // Fields:
+    //   - title: string (required)
+    //   - date: string (required)
+    //   - status: string (required, enum: Pending, New, Completed)
+    //   - type: string (optional)
+    //   - patient_id: string (required, matches auth.uid)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "kraitworld@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isRecent(time) {
+      return time is string && duration.value(request.time - timestamp.date(time)).hours() < 24;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'uid', 'full_name']) &&
+             data.email is string && isValidEmail(data.email) &&
+             data.uid == request.auth.uid &&
+             data.full_name is string && data.full_name.size() > 0 && data.full_name.size() < 100 &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 20)) &&
+             (!('dob' in data) || (data.dob is string && (data.dob == "" || data.dob.matches("^\\d{4}-\\d{2}-\\d{2}$")))) &&
+             (!('gender' in data) || (data.gender in ['Male', 'Female', 'Other'])) &&
+             (!('nationality' in data) || (data.nationality is string && data.nationality.size() < 50)) &&
+             (!('height' in data) || (data.height is number || data.height == null)) &&
+             (!('weight' in data) || (data.weight is number || data.weight == null)) &&
+             (!('blood_group' in data) || (data.blood_group is string && data.blood_group.size() < 10)) &&
+             (!('chronic_diseases' in data) || (data.chronic_diseases is string && data.chronic_diseases.size() < 1000)) &&
+             (!('allergies' in data) || (data.allergies is string && data.allergies.size() < 1000)) &&
+             (!('current_meds' in data) || (data.current_meds is string && data.current_meds.size() < 1000)) &&
+             (!('surgeries' in data) || (data.surgeries is string && data.surgeries.size() < 1000)) &&
+             (!('emergency_contact' in data) || (data.emergency_contact is string && data.emergency_contact.size() < 100)) &&
+             (!('smoking_status' in data) || (data.smoking_status in ['Never', 'Former', 'Current'])) &&
+             (!('alcohol_use' in data) || (data.alcohol_use in ['Never', 'Occasional', 'Frequent'])) &&
+             (!('photo_url' in data) || (data.photo_url is string && data.photo_url.size() < 2000000));
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['title', 'date', 'status', 'patient_id']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.status in ['Pending', 'New', 'Completed'] &&
+             data.patient_id == request.auth.uid;
+    }
+
+    function isValidChat(data) {
+      return data.keys().hasAll(['patient_id', 'title', 'timestamp']) &&
+             data.patient_id == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200;
+    }
+
+    function isValidMedicine(data) {
+      return data.keys().hasAll(['name', 'composition', 'uses']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.composition is string && data.composition.size() > 0 &&
+             data.uses is string && data.uses.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.uid == resource.data.uid;
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAuthenticated() && (resource.data.patient_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidReport(request.resource.data);
+      allow update: if isAuthenticated() && isValidReport(request.resource.data) && 
+                      request.resource.data.patient_id == resource.data.patient_id;
+      allow delete: if isAuthenticated() && (resource.data.patient_id == request.auth.uid || isAdmin());
+    }
+
+    match /chats/{chatId} {
+      allow read: if isAuthenticated() && (resource.data.patient_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidChat(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.patient_id == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.patient_id == request.auth.uid || isAdmin());
+    }
+
+    match /medicines/{medicineId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
